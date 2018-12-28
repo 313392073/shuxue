@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title></title>
+		<style>
+		canvas {float:left;width:800px;border:1px solid red;}
+		p {float:left;width:100%;line-height:10px;}
+		</style>
+	</head>
+	<body>
+	<p>请在下方涂画公式：</p> 
+	<p><canvas id="canvas" width="800" height="400"></canvas></p>
+	<p><input type="button" onclick="prev()" value="prev" />
+		<input type="button" onclick="next()" value="next" />
+		<input type="button" onclick="clearAll()" value="clearAll" />
+		<input type="button" onclick="submit()" value="submit" />
+	</p> 
+	<p>
+		解析结果为：<span id="result"></span>
+	</p> 
+	
+	</body>
+</html>
+<script src="jquery.min.js"></script>
+<script>
+	var canvasMoveUse=!1;
+    var preDrawAry= [],
+                nextDrawAry= [],
+                middleAry= [],
+                retArr= [],
+                tmpArr= [],
+                trashArr= [];
+				
+	var canvas = document.getElementById('canvas'); // 得到画布
+	var context = canvas.getContext('2d'); // 得到画布的上下文对象 
+	context.shadowBlur=1;
+	context.lineWidth=1;	
+	context.shadowColor="#000000";
+	context.strokeStyle="#000000";
+	
+	initDraw();
+	function initDraw() {
+		var t = context.getImageData(0, 0, 800, 400);
+		middleAry.push(t)
+	}
+
+	if(IsPC()){
+		/* 为canvas绑定mouse事件 */ 
+		document.getElementById('canvas').addEventListener('mousedown',onMouseStart,false);
+		document.getElementById('canvas').addEventListener('mousemove',onMouseMove,false);
+		document.getElementById('canvas').addEventListener('mouseup',onMouseEnd,false);
+		function onMouseStart(t){
+			tmpArr = [],
+			canvasMoveUse = !0;
+			var e = t.clientX - t.target.parentNode.offsetLeft,
+			r = t.clientY - t.target.parentNode.offsetTop;
+			context.beginPath(),
+			context.moveTo(e, r);
+			var n = context.getImageData(0, 0, 800, 400);
+			preDrawAry.push(n)
+		}
+
+		function onMouseMove(t){
+			if (canvasMoveUse) {
+				var e = t.target,
+				r = t.clientX - e.parentNode.offsetLeft,
+				n = t.clientY - e.parentNode.offsetTop;
+				tmpArr.push([r, n]),
+				context.lineTo(r, n),
+				context.stroke()
+			}
+		}
+		function onMouseEnd(){
+			var e = context.getImageData(0, 0, 800, 400);
+			retArr.push(tmpArr),
+			trashArr = [],
+			nextDrawAry.length ? (middleAry = [], middleAry = middleAry.concat(preDrawAry), middleAry.push(e), nextDrawAry = []) : middleAry.push(e),
+			canvasMoveUse = !1
+		}
+	}else{
+		document.getElementById('canvas').addEventListener('touchstart',onTouchStart,false);
+		document.getElementById('canvas').addEventListener('touchmove',onTouchMove,false);
+		document.getElementById('canvas').addEventListener('touchend',onTouchEnd,false);
+		function onTouchStart(t){
+			tmpArr = [],
+			canvasMoveUse = !0;
+			var e = t.touches[0].clientX - t.target.parentNode.offsetLeft,
+			r = t.touches[0].clientY - t.target.parentNode.offsetTop;
+			context.beginPath(),
+			context.moveTo(e, r);
+			var n = context.getImageData(0, 0, 800, 400);
+			preDrawAry.push(n)
+		}
+
+		function onTouchMove(t){
+			if (canvasMoveUse) {
+				var e = t.target,
+				r = t.touches[0].clientX - e.parentNode.offsetLeft,
+				n = t.touches[0].clientY - e.parentNode.offsetTop;
+				tmpArr.push([r, n]),
+				context.lineTo(r, n),
+				context.stroke()
+			}
+			t.preventDefault()
+		}
+		function onTouchEnd(){
+			var e = context.getImageData(0, 0, 800, 400);
+			retArr.push(tmpArr),
+			trashArr = [],
+			nextDrawAry.length ? (middleAry = [], middleAry = middleAry.concat(preDrawAry), middleAry.push(e), nextDrawAry = []) : middleAry.push(e),
+			canvasMoveUse = !1
+		}
+	}
+	function prev() {
+		if (preDrawAry.length) {
+			var e = preDrawAry.pop(),
+			r = middleAry[preDrawAry.length + 1];
+			nextDrawAry.push(r),
+			trashArr.push(retArr.pop()),
+			context.putImageData(e, 0, 0)
+		}
+	}
+	function next() {
+		if (nextDrawAry.length) {
+			var n = nextDrawAry.pop(),
+			i = middleAry[middleAry.length - nextDrawAry.length - 2];
+			preDrawAry.push(i),
+			retArr.push(trashArr.pop()),
+			context.putImageData(n, 0, 0)
+		}
+	}
+	function clearAll() {
+		retArr = [],
+		context.clearRect(0, 0, canvas.width, canvas.height),
+		preDrawAry = [],
+		nextDrawAry = [],
+		middleAry = [middleAry[0]]
+	}
+	function submit(){
+		var e = {
+			data: this.arrToStr(this.retArr)
+		};
+		$.ajax({
+			type: 'POST',
+			url: 'http://www.charmbox.cn/api/formula/get_dot',
+			data: e,
+			dataType: "json",
+			contentType: "application/x-www-form-urlencoded",
+			success: function (back) {
+				console.log(back)
+			}
+		})
+	}
+	function arrToStr(t) {
+		var e = "";
+		e += "[";
+		for (var r = 0,
+		n = t.length; r < n; r++) if (t[r].length > 0) {
+			e += "[";
+			for (var i = 0,
+			o = t[r].length; i < o; i++) t[r][i].length > 0 && (e += "[" + t[r][i][0] + "," + t[r][i][1] + "]", i < o - 1 && (e += ","));
+			e += "]",
+			r < n - 1 && (e += ",")
+		}
+		return e += "]"
+	}
+	function IsPC() {
+		var userAgentInfo = navigator.userAgent;
+		var Agents = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPad", "iPod"];
+		var flag = true;
+		for (var v = 0; v < Agents.length; v++) {
+			if (userAgentInfo.indexOf(Agents[v]) > 0) {
+				flag = false;
+				break;
+			}
+		}
+		return flag;
+	}
+	
+</script>
